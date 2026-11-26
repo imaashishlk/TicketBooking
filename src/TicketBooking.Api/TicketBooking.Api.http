@@ -1,0 +1,49 @@
+@TicketBooking.Api_HostAddress = http://localhost:5267
+
+### Create Event
+POST {{TicketBooking.Api_HostAddress}}/api/events
+Content-Type: application/json
+
+{
+  "name": "Music Concert",
+  "startsAtUtc": "2027-06-15T18:00:00Z",
+  "totalTickets": 10
+}
+
+### Create User
+POST {{TicketBooking.Api_HostAddress}}/api/users
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "user@example.com"
+}
+
+### Get All Events
+GET {{TicketBooking.Api_HostAddress}}/api/events
+
+### Get Event By Id
+GET {{TicketBooking.Api_HostAddress}}/api/events/1
+
+### Get All Users
+GET {{TicketBooking.Api_HostAddress}}/api/users
+
+### Create Booking
+POST {{TicketBooking.Api_HostAddress}}/api/bookings
+Content-Type: application/json
+
+{
+    "userId": 1,
+    "eventId": 1
+}
+
+###
+### Create Event
+POST {{TicketBooking.Api_HostAddress}}/api/events
+Content-Type: application/json
+
+{
+  "name": "Concurrency SemaphoreSlim",
+  "startsAtUtc": "2027-06-15T18:00:00Z",
+  "totalTickets": 10
+}
