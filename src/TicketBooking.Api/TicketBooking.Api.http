@@ -43,7 +43,7 @@ POST {{TicketBooking.Api_HostAddress}}/api/events
 Content-Type: application/json
 
 {
-  "name": "Concurrency SemaphoreSlim",
-  "startsAtUtc": "2027-06-15T18:00:00Z",
-  "totalTickets": 10
+    "name": "Pessimistic Locking Test",
+    "startsAtUtc": "2027-06-15T18:00:00Z",
+    "totalTickets": 10
 }
