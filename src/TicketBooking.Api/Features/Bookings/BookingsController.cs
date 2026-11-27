@@ -9,10 +9,6 @@ namespace TicketBooking.Api.Features.Bookings;
 [Route("api/[controller]")]
 public class BookingsController(AppDbContext db) : ControllerBase
 {
-    // SemaphoreSlim is used to ensure that only one thread can access the critical section of code at a time,
-    // preventing race conditions when multiple requests are made simultaneously.
-    private static readonly SemaphoreSlim _gate = new(1,1);
-
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -29,7 +25,7 @@ public class BookingsController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateBookingRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(CreateBookingRequest request, CancellationToken cancellationToken)
     {
         var userExists = await db.Users.AnyAsync(u => u.Id == request.UserId, cancellationToken);
         if (!userExists) return NotFound("User not found");
