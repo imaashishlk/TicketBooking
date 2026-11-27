@@ -31,42 +31,38 @@ public class BookingsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBookingRequest request, CancellationToken cancellationToken)
     {
-        var userExists = await db.Users.AnyAsync(u => u.Id == request.UserId);
+        var userExists = await db.Users.AnyAsync(u => u.Id == request.UserId, cancellationToken);
+        if (!userExists) return NotFound("User not found");
 
-        if (!userExists)
-            return NotFound("User not found");
+        // event is reserved keyword, so using @event to avoid naming conflict
+        var @event = await db.Events.AnyAsync(e => e.Id == request.EventId, cancellationToken);
+        if (!@event) return NotFound("Event not found");
 
-        await _gate.WaitAsync(cancellationToken);
+        // Begin transaction (explicitly) to ensure that the booking creation and ticket availability update are atomic.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        try
+
+        var rowsAffected = await db.Events
+                        .Where(e => e.Id == request.EventId && e.AvailableTickets > 0)
+                        .ExecuteUpdateAsync(e => e.SetProperty(ev => ev.AvailableTickets,
+                            ev => ev.AvailableTickets - 1), cancellationToken);
+
+        if (rowsAffected == 0) return Conflict("No tickets available for this event");
+
+        var booking = new Booking
         {
-            // event is reserved keyword, so using @event to avoid naming conflict
-            var @event = await db.Events.FindAsync(request.EventId);
+            UserId = request.UserId,
+            EventId = request.EventId,
+            Status = "Confirmed",
+            CreatedAtUtc = DateTime.UtcNow
+        };
 
-            if (@event is null)
-                return NotFound("Event not found");
+        db.Bookings.Add(booking);
 
-            if (@event.AvailableTickets <= 0)
-            {
-                return Conflict("No tickets available for this event");
-            }
+        await db.SaveChangesAsync(cancellationToken);
 
-            @event.AvailableTickets--;
+        await transaction.CommitAsync(cancellationToken);
 
-            var booking = new Booking
-            {
-                UserId = request.UserId,
-                EventId = request.EventId,
-            };
-
-            db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
     }
 }
