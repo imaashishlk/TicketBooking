@@ -33,8 +33,8 @@ POST {{TicketBooking.Api_HostAddress}}/api/bookings
 Content-Type: application/json
 
 {
-    "userId": 1,
-    "eventId": 1
+    "userId": 241,
+    "eventId": 5
 }
 
 ###
@@ -43,7 +43,18 @@ POST {{TicketBooking.Api_HostAddress}}/api/events
 Content-Type: application/json
 
 {
-  "name": "Concurrency SemaphoreSlim",
+  "name": "Rollover Test",
   "startsAtUtc": "2027-06-15T18:00:00Z",
   "totalTickets": 10
+}
+
+###
+### Create Event for Concurrency (Optimistic)
+POST {{TicketBooking.Api_HostAddress}}/api/events
+Content-Type: application/json
+
+{
+    "name": "Optimistic Concurrency Test 2",
+    "startsAtUtc": "2027-06-15T18:00:00Z",
+    "totalTickets": 10
 }

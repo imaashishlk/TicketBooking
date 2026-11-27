@@ -9,10 +9,6 @@ namespace TicketBooking.Api.Features.Bookings;
 [Route("api/[controller]")]
 public class BookingsController(AppDbContext db) : ControllerBase
 {
-    // SemaphoreSlim is used to ensure that only one thread can access the critical section of code at a time,
-    // preventing race conditions when multiple requests are made simultaneously.
-    private static readonly SemaphoreSlim _gate = new(1,1);
-
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -29,44 +25,73 @@ public class BookingsController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateBookingRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(
+    CreateBookingRequest request,
+    CancellationToken cancellationToken)
     {
-        var userExists = await db.Users.AnyAsync(u => u.Id == request.UserId);
+        var userExists = await db.Users.AnyAsync(
+            u => u.Id == request.UserId,
+            cancellationToken);
 
         if (!userExists)
-            return NotFound("User not found");
+            return NotFound("User not found.");
 
-        await _gate.WaitAsync(cancellationToken);
+        const int maxAttempts = 20;
 
-        try
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            // event is reserved keyword, so using @event to avoid naming conflict
-            var @event = await db.Events.FindAsync(request.EventId);
+            var item = await db.Events.FindAsync(
+                new object[] { request.EventId },
+                cancellationToken);
 
-            if (@event is null)
-                return NotFound("Event not found");
+            if (item is null)
+                return NotFound("Event not found.");
 
-            if (@event.AvailableTickets <= 0)
-            {
-                return Conflict("No tickets available for this event");
-            }
+            if (item.AvailableTickets <= 0)
+                return Conflict("Tickets are sold out.");
 
-            @event.AvailableTickets--;
+            item.AvailableTickets--;
 
             var booking = new Booking
             {
                 UserId = request.UserId,
                 EventId = request.EventId,
+                Status = "Confirmed",
+                CreatedAtUtc = DateTime.UtcNow
             };
 
             db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+
+                return StatusCode(201, new
+                {
+                    booking.Id,
+                    booking.UserId,
+                    booking.EventId,
+                    booking.Status,
+                    booking.CreatedAtUtc
+                });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                db.ChangeTracker.Clear();
+
+                if (attempt == maxAttempts)
+                {
+                    return StatusCode(
+                        503,
+                        "Booking temporarily unavailable. Please retry.");
+                }
+
+                await Task.Delay(
+                    Random.Shared.Next(10, 50),
+                    cancellationToken);
+            }
         }
-        finally
-        {
-            _gate.Release();
-        }
+
+        return StatusCode(503, "Booking temporarily unavailable.");
     }
 }

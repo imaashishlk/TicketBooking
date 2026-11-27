@@ -8,6 +8,7 @@ const EVENT_ID = Number(__ENV.EVENT_ID);
 const successfulBookings = new Counter('successful_bookings');
 const soldOutBookings = new Counter('sold_out_bookings');
 const unexpectedErrors = new Counter('unexpected_errors');
+const temporarilyUnavailable = new Counter('unavailable_errors');
 
 // Expected statuses, from the backend 
 http.setResponseCallback(http.expectedStatuses(201, 409));
@@ -61,12 +62,13 @@ export default function (users) {
 
     successfulBookings.add(response.status === 201 ? 1 : 0);
     soldOutBookings.add(response.status === 409 ? 1 : 0);
+    temporarilyUnavailable.add(response.status === 503 ? 1 : 0);
     unexpectedErrors.add(
-        response.status !== 201 && response.status !== 409 ? 1 : 0
+        response.status !== 201 && response.status !== 409 && response.status !== 503 ? 1 : 0
     );
 
     check(response, {
         'valid booking response': (r) =>
-            r.status === 201 || r.status === 409,
+            r.status === 201 || r.status === 409 || r.status === 503,
     });
 }

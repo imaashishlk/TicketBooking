@@ -9,7 +9,7 @@ FROM Events e
 LEFT JOIN Bookings b
     ON e.Id = b.EventId
     AND b.Status = 'Confirmed'
-WHERE e.Id = 1
+WHERE e.Id = 4
 GROUP BY
     e.Id,
     e.TotalTickets,

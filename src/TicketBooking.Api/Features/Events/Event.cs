@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TicketBooking.Api.Features.Events;
 
 public class Event
@@ -7,4 +9,7 @@ public class Event
     public int TotalTickets { get; set; }
     public int AvailableTickets { get; set; }
     public DateTime StartsAtUtc { get; set; }
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = null!;
 }
