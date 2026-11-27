@@ -35,8 +35,8 @@ public class BookingsController(AppDbContext db) : ControllerBase
         if (!userExists) return NotFound("User not found");
 
         // event is reserved keyword, so using @event to avoid naming conflict
-        var @event = await db.Events.AnyAsync(e => e.Id == request.EventId, cancellationToken);
-        if (!@event) return NotFound("Event not found");
+        //var @event = await db.Events.AnyAsync(e => e.Id == request.EventId, cancellationToken);
+        //if (!@event) return NotFound("Event not found");
 
         // Begin transaction (explicitly) to ensure that the booking creation and ticket availability update are atomic.
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
