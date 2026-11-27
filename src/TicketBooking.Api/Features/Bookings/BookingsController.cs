@@ -27,34 +27,23 @@ public class BookingsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateBookingRequest request, CancellationToken cancellationToken)
     {
-        var userExists = await db.Users.AnyAsync(
-            u => u.Id == request.UserId,
-            cancellationToken);
+        var userExists = await db.Users.AnyAsync(u => u.Id == request.UserId, cancellationToken);
+        if (!userExists) return NotFound("User not found");
 
-        if (!userExists)
-            return NotFound("User not found.");
+        // event is reserved keyword, so using @event to avoid naming conflict
+        var @event = await db.Events.AnyAsync(e => e.Id == request.EventId, cancellationToken);
+        if (!@event) return NotFound("Event not found");
 
-        // Begin transaction, and dispose if not complete
-        await using var transaction =
-            await db.Database.BeginTransactionAsync(
-                cancellationToken);
+        // Begin transaction (explicitly) to ensure that the booking creation and ticket availability update are atomic.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        var item = await db.Events
-            .FromSqlInterpolated($"""
-                        SELECT *
-                        FROM Events WITH (UPDLOCK, ROWLOCK)
-                        WHERE Id = {request.EventId}
-                        """)
-            .AsTracking()
-            .SingleOrDefaultAsync(cancellationToken);
 
-        if (item is null)
-            return NotFound("Event not found.");
+        var rowsAffected = await db.Events
+                        .Where(e => e.Id == request.EventId && e.AvailableTickets > 0)
+                        .ExecuteUpdateAsync(e => e.SetProperty(ev => ev.AvailableTickets,
+                            ev => ev.AvailableTickets - 1), cancellationToken);
 
-        if (item.AvailableTickets <= 0)
-            return Conflict("Tickets are sold out.");
-
-        item.AvailableTickets--;
+        if (rowsAffected == 0) return Conflict("No tickets available for this event");
 
         var booking = new Booking
         {
@@ -70,13 +59,6 @@ public class BookingsController(AppDbContext db) : ControllerBase
 
         await transaction.CommitAsync(cancellationToken);
 
-        return StatusCode(201, new
-        {
-            booking.Id,
-            booking.UserId,
-            booking.EventId,
-            booking.Status,
-            booking.CreatedAtUtc
-        });
+        return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
     }
 }
